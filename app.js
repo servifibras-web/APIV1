@@ -187,7 +187,28 @@ function openDetail(id){
   const air=p.ship==='AIR';
   const fotoBox = p.img
     ? `<img src="${p.img}" alt="${p.code}" style="width:100%;border-radius:10px;display:block">`
-    : `<div class="modal-nofoto">⚠ FALTA FOTO<br><small>Buscala con los botones de abajo y cargala a mano</small></div>`;
+    : `<div class="modal-nofoto">⚠ FALTA FOTO<br><small>Conseguila del proveedor y cargala a mano</small></div>`;
+  // Camino B — busqueda por imagen real (no por texto generico).
+  // Con foto: descargar/copiar la imagen y abrir Google Lens para pegarla.
+  // Sin foto: no hay imagen para buscar; queda una busqueda manual por codigo.
+  // NOTA: p.img es la unica resolucion disponible (imagen embebida en el Excel
+  //   original, tipo thumbnail). Conviene a futuro cargar fotos de mejor calidad
+  //   para que la busqueda por imagen y la publicacion luzcan mejor.
+  const fotoActions = p.img
+    ? `<div class="modal-search">
+          <span>Encontrá el producto por su foto</span>
+          <div class="srch-row">
+            <button type="button" class="srch dl" id="btnDl">⬇ Descargar foto</button>
+            <button type="button" class="srch copy" id="btnCopy">⧉ Copiar imagen</button>
+          </div>
+          <a href="https://lens.google.com/" target="_blank" rel="noopener" class="srch goo">Buscar por imagen en Google ↗</a>
+          <p class="srch-help"><b>1.</b> Descargá la foto · <b>2.</b> abrí Google · <b>3.</b> pegá o arrastrá la imagen para encontrar el producto exacto.</p>
+        </div>`
+    : `<div class="modal-search">
+          <span>Sin foto cargada</span>
+          <p class="srch-help">Este producto no tiene foto, así que no se puede buscar por imagen. Conseguila del proveedor y cargala. Para empezar, podés buscar el código a mano:</p>
+          <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(String(p.code).trim()+' silicone mold resin')}" target="_blank" rel="noopener" class="srch goo">Buscar "${p.code}" en Google ↗</a>
+        </div>`;
   back.innerHTML=`
   <div class="modal">
     <div class="modal-head">
@@ -200,11 +221,7 @@ function openDetail(id){
     <div class="modal-body">
       <div class="modal-left">
         ${fotoBox}
-        <div class="modal-search">
-          <span>Buscar foto del producto:</span>
-          <a href="${linkAlibaba(p)}" target="_blank" rel="noopener" class="srch ali">Alibaba ↗</a>
-          <a href="${linkGoogleImg(p)}" target="_blank" rel="noopener" class="srch goo">Google Imágenes ↗</a>
-        </div>
+        ${fotoActions}
       </div>
       <div class="modal-right">
         <div class="tabs">
@@ -242,8 +259,62 @@ function openDetail(id){
       }).catch(()=>{ txtEl.select(); document.execCommand('copy'); });
     };
   });
+  // ----- Camino B: descargar / copiar la foto del producto -----
+  const dlBtn=back.querySelector('#btnDl');
+  if(dlBtn){
+    dlBtn.onclick=()=>{
+      try{
+        const blob=dataURItoBlob(p.img);
+        const url=URL.createObjectURL(blob);
+        const ext=blob.type.includes('png')?'png':blob.type.includes('webp')?'webp':'jpg';
+        const a=document.createElement('a');
+        a.href=url; a.download=String(p.code).replace(/[^a-z0-9]+/gi,'_')+'.'+ext;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1500);
+        flashBtn(dlBtn,'✓ Descargada');
+      }catch(e){ console.error(e); flashBtn(dlBtn,'Error',true); }
+    };
+  }
+  const copyBtn=back.querySelector('#btnCopy');
+  if(copyBtn){
+    copyBtn.onclick=()=>{
+      // Copiar imagen al portapapeles solo anda en navegadores modernos (y
+      // requiere convertir a PNG). En muchos celulares no esta soportado: ahi
+      // el operador usa "Descargar foto". Por eso es best-effort.
+      if(!navigator.clipboard || !window.ClipboardItem){ flashBtn(copyBtn,'No disponible',true); return; }
+      const im=new Image();
+      im.onload=()=>{
+        try{
+          const cv=document.createElement('canvas');
+          cv.width=im.naturalWidth; cv.height=im.naturalHeight;
+          cv.getContext('2d').drawImage(im,0,0);
+          cv.toBlob(async(b)=>{
+            try{ await navigator.clipboard.write([new ClipboardItem({'image/png':b})]); flashBtn(copyBtn,'✓ Copiada'); }
+            catch(e){ console.error(e); flashBtn(copyBtn,'No se pudo',true); }
+          },'image/png');
+        }catch(e){ console.error(e); flashBtn(copyBtn,'No se pudo',true); }
+      };
+      im.onerror=()=>flashBtn(copyBtn,'No se pudo',true);
+      im.src=p.img;
+    };
+  }
 }
 function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Convierte una data URI (base64) en Blob, para descarga robusta de imagenes grandes.
+function dataURItoBlob(dataURI){
+  const [meta,b64]=dataURI.split(',');
+  const mime=((meta.match(/data:([^;]+)/)||[])[1])||'image/jpeg';
+  const bin=atob(b64); const len=bin.length; const arr=new Uint8Array(len);
+  for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+// Feedback efimero en un boton (ok/err).
+function flashBtn(btn,msg,err){
+  const old=btn.textContent;
+  btn.textContent=msg; btn.classList.add(err?'err':'ok');
+  setTimeout(()=>{ btn.textContent=old; btn.classList.remove('ok','err'); },1600);
+}
 
 
 /* ========= INIT ========= */

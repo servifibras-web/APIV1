@@ -92,6 +92,6 @@ function txtMercadoLibre(p){
   t+=`Importador directo de materiales para resina epoxi. Más de 25 años en el mercado. Envíos a todo el país. Consultanos por mayorista.`;
   return t;
 }
-// Links de búsqueda de fotos
-function linkAlibaba(p){ const c=clasificar(p); const q=encodeURIComponent(`${p.code} ${c.tipo} silicone mold resin`); return `https://www.alibaba.com/trade/search?SearchText=${q}`; }
-function linkGoogleImg(p){ const c=clasificar(p); const q=encodeURIComponent(`${p.code} ${c.tipo} silicone mold resin`); return `https://www.google.com/search?tbm=isch&q=${q}`; }
+// (Se quitaron linkAlibaba/linkGoogleImg: la busqueda por texto generica
+//  llevaba a moldes en general, no al producto. Ahora la busqueda es por
+//  IMAGEN real, manejada en el modal de app.js — Camino B.)
