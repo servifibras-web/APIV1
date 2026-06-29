@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero de Publicaciones · ServiFibras</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<!-- LOGIN GATE -->
+<div id="gate">
+  <div class="gatebox">
+    <div class="brand"><div class="hex">S</div><h1>Servi<span>Fibras</span></h1></div>
+    <p class="sub">Tablero de publicaciones · Moldes Junio 2026</p>
+    <label>¿Quién sos?</label>
+    <div class="who" id="whoList"></div>
+    <button class="enter" id="enterBtn" disabled>Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="top">
+    <div class="id">
+      <div class="hex">S</div>
+      <div><b>Servi<span>Fibras</span></b><div class="role" id="roleLabel"></div></div>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" id="switchBtn">Cambiar usuario</button>
+    </div>
+  </div>
+
+  <!-- Progreso de todos -->
+  <div class="strip" id="strip"></div>
+
+  <!-- Panel de asignación (solo encargado) -->
+  <div id="assign" class="hidden"></div>
+
+  <!-- Filtros -->
+  <div class="fbar" id="fbar">
+    <div class="seg" id="segFilter">
+      <button data-f="todos" class="on">Todas</button>
+      <button data-f="pend">Pendientes</button>
+      <button data-f="done">Hechas</button>
+    </div>
+    <div class="count" id="count"></div>
+  </div>
+
+  <!-- Grilla -->
+  <div class="grid" id="grid"></div>
+  <div class="empty hidden" id="empty"><b>No hay tareas acá</b>Cambiá el filtro o esperá que el encargado asigne tu tanda.</div>
+</div>
+<script src="plantillas.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
