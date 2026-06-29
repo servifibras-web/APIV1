@@ -12,8 +12,12 @@ let P = []; // se completa al cargar productos.json (ver init al final)
 const K_ASSIGN = "assign:"+LOTE_ID;
 const K_DONE   = "done:"+LOTE_ID;
 
-async function sGet(key){ try{const r=await window.storage.get(key,true);return r?JSON.parse(r.value):null;}catch(e){return null;} }
-async function sSet(key,val){ try{await window.storage.set(key,JSON.stringify(val),true);}catch(e){console.error(e);} }
+// Persistencia por dispositivo (localStorage). Antes usaba window.storage de
+// Claude.ai (no existe fuera de ahi). Para avance compartido entre dispositivos
+// hace falta un backend (ver docs/ — etapa siguiente). Se mantienen async para
+// no tocar a los que las llaman con await, y para poder cambiar el motor luego.
+async function sGet(key){ try{const r=localStorage.getItem(key);return r?JSON.parse(r):null;}catch(e){return null;} }
+async function sSet(key,val){ try{localStorage.setItem(key,JSON.stringify(val));}catch(e){console.error(e);} }
 
 /* sesión local segura (no rompe si sessionStorage no está disponible) */
 const SS={

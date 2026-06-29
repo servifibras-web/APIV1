@@ -22,6 +22,16 @@ Lote actual: **Moldes Junio 2026** — 107 productos (77 SEA + 30 AIR), 104 con 
 Esta versión es el resultado de separar el HTML monolítico original en archivos,
 **sin cambiar el comportamiento**.
 
+## Publicación (GitHub Pages)
+
+El tablero se sirve como sitio estático desde la rama `main` en GitHub Pages:
+
+**https://servifibras-web.github.io/apiv1/**
+
+El archivo `.nojekyll` desactiva el procesamiento Jekyll (servimos los archivos
+tal cual). Todas las rutas son **relativas**, así que funciona bajo el subpath
+`/apiv1/` sin romper el `fetch` de `productos.json`.
+
 ## Cómo probarlo en local
 
 ```bash
@@ -29,14 +39,21 @@ python3 -m http.server 8099
 # abrir http://localhost:8099/index.html
 ```
 
-> El avance todavía **no se persiste** fuera de Claude.ai: el código usa
-> `window.storage` (API exclusiva de Claude.ai). Fuera de ahí funciona en
-> memoria por sesión. Reemplazar esto por un backend compartido es el próximo
-> paso (ver `docs/INSTRUCCIONES_Claude_Code.md`, sección 5).
+## Persistencia
+
+Por ahora el avance se guarda con **`localStorage` (por dispositivo)**: cada
+celular/compu recuerda su propio avance, pero **no se comparte entre
+dispositivos** (el encargado no ve en vivo lo que tilda el del depósito). El
+reparto es determinístico, así que todos los dispositivos calculan la misma
+tanda por operador.
+
+> Para avance **compartido en vivo** hace falta un backend (paso 2 del roadmap).
+> Antes usaba `window.storage`, exclusivo de Claude.ai.
 
 ## Roadmap (ver `docs/`)
 
-1. ✅ Separar el HTML en archivos (hecho).
-2. ⏳ Backend en el Droplet (DigitalOcean): persistencia compartida + proxy seguro para la API de Claude.
-3. ⏳ Motor de descripciones por API + foto (reemplaza las plantillas genéricas).
-4. ⏳ Deploy al Droplet, reparto manual por cantidades, generación de imágenes (fase final).
+1. ✅ Separar el HTML en archivos.
+2. ✅ Persistencia por dispositivo (localStorage) + publicación en GitHub Pages para probar con operadores.
+3. ⏳ Backend en el Droplet (DigitalOcean): persistencia compartida + proxy seguro para la API de Claude.
+4. ⏳ Motor de descripciones por API + foto (reemplaza las plantillas genéricas).
+5. ⏳ Reparto manual por cantidades, generación de imágenes (fase final).
