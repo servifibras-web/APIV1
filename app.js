@@ -7,10 +7,24 @@ const BOSS = "Encargado";
 const LOTE_ID = "moldes_jun2026"; // si cargás otro lote, cambiá esto
 let P = []; // se completa al cargar productos.json (ver init al final)
 
+// URL del backend de generación de descripciones (DigitalOcean App Platform,
+// servicio aislado). Se puede dejar vacío y configurarlo desde el tablero
+// (botón "Backend" del Encargado) -> queda en localStorage, sin redeploy.
+const BACKEND_URL = "";
+function getBackendURL(){ return ((localStorage.getItem('backend_url')||BACKEND_URL||'').trim()).replace(/\/+$/,''); }
+
 /* ========= STORAGE ========= */
 // claves: assign:LOTE -> {opName:[ids]} ; done:LOTE -> {id:{by,ts}}
 const K_ASSIGN = "assign:"+LOTE_ID;
 const K_DONE   = "done:"+LOTE_ID;
+const K_DESC   = "desc:"+LOTE_ID; // {code: {tipo_real,nombre_publicacion,categoria,contradice_excel,nota_revision,html_tiendanube,txt_mercadolibre,ts,edited}}
+
+// Caché de descripciones generadas (localStorage; persistente por dispositivo).
+function descAll(){ try{ return JSON.parse(localStorage.getItem(K_DESC)||'{}'); }catch(e){ return {}; } }
+function descGet(code){ return descAll()[String(code)] || null; }
+function descSet(code,obj){ const a=descAll(); a[String(code)]=obj; try{ localStorage.setItem(K_DESC,JSON.stringify(a)); }catch(e){ console.error(e); } }
+// Nombre a mostrar: el corregido por la foto si ya se generó; si no, el provisional del Excel.
+function nombreMostrar(p){ const d=descGet(p.code); return (d&&d.nombre_publicacion) ? d.nombre_publicacion : clasificar(p).es; }
 
 // Persistencia por dispositivo (localStorage). Antes usaba window.storage de
 // Claude.ai (no existe fuera de ahi). Para avance compartido entre dispositivos
@@ -118,7 +132,11 @@ function renderGrid(){
     card.className="card"+(isDone?" done":"");
     const air=p.ship==='AIR';
     const imgHtml = p.img? `<img loading="lazy" src="${p.img}" alt="${p.code}">` : `<div class="noimg nofoto">⚠ FALTA FOTO<br><small>cargar a mano</small></div>`;
-    const desc = p.desc? p.desc : '—';
+    const d = descGet(p.code);
+    const descName = d ? (d.nombre_publicacion || clasificar(p).es) : clasificar(p).es;
+    const descBadge = d
+      ? `<span class="dbadge${d.contradice_excel?' fix':''}">${d.contradice_excel?'categoría corregida ✓':'descripción lista ✓'}</span>`
+      : '';
     const size = p.size? `<div class="size">${p.size}</div>` : '';
     const ownerTag = isBoss()? `<div class="owner">Asignado a: ${owner||'—'}${isDone&&DONE[id].by?' · hecho por '+DONE[id].by:''}</div>`:'';
     const canToggle = isBoss() || owner===ME;
@@ -131,8 +149,9 @@ function renderGrid(){
       </div>
       <div class="meta" data-open="${id}">
         <div class="code">${p.code}</div>
-        <div class="desc">${clasificar(p).es}</div>
+        <div class="desc">${descName}</div>
         ${size}
+        ${descBadge}
       </div>
       ${ownerTag}
       ${canToggle? `<button class="toggle" data-id="${id}">${isDone?'✓ Publicada':'Marcar publicada'}</button>` : `<div class="owner" style="padding-bottom:11px">Tanda de ${owner}</div>`}`;
@@ -169,20 +188,27 @@ function buildAssignPanel(){
     <div class="assign-actions">
       <button class="btn-pri" id="rebalance">Reparto parejo</button>
       <button class="btn-ghost" id="resetDone">Borrar todo el avance</button>
+      <button class="btn-ghost" id="cfgBackend">⚙ Backend de descripciones</button>
     </div>
-    <div class="note">Conteo actual — ${counts}<br>El reparto reordena por cantidad respetando el orden de la lista. El avance ya marcado no se pierde al reasignar.</div>`;
+    <div class="note">Conteo actual — ${counts}<br>Backend de descripciones: <b>${getBackendURL()||'sin configurar'}</b><br>El reparto reordena por cantidad respetando el orden de la lista. El avance ya marcado no se pierde al reasignar.</div>`;
   document.getElementById('rebalance').onclick=async()=>{
     ASSIGN=autoAssign(); await sSet(K_ASSIGN,ASSIGN); buildAssignPanel(); renderStrip(); renderGrid();
   };
   document.getElementById('resetDone').onclick=async()=>{
     if(confirm('¿Borrar TODO el avance de este lote? No se puede deshacer.')){ DONE={}; await sSet(K_DONE,DONE); renderStrip(); renderGrid(); }
   };
+  document.getElementById('cfgBackend').onclick=()=>{
+    const v=prompt('URL del backend de descripciones (DigitalOcean App Platform).\nEj: https://servifibras-backend-xxxxx.ondigitalocean.app\n\n(Vacío para borrar la configuración.)', getBackendURL());
+    if(v===null) return;
+    if(v.trim()) localStorage.setItem('backend_url', v.trim().replace(/\/+$/,''));
+    else localStorage.removeItem('backend_url');
+    buildAssignPanel();
+  };
 }
 
 /* ========= MODAL DETALLE ========= */
 function openDetail(id){
-  const p=P[id]; const c=clasificar(p); const owner=ownerOf(id); const isDone=!!DONE[id];
-  const html=htmlTiendaNube(p); const txt=txtMercadoLibre(p);
+  const p=P[id]; const owner=ownerOf(id); const isDone=!!DONE[id];
   const back=document.createElement('div'); back.className='modal-back';
   const air=p.ship==='AIR';
   const fotoBox = p.img
@@ -214,7 +240,7 @@ function openDetail(id){
     <div class="modal-head">
       <div>
         <div class="modal-code">${p.code} <span class="ship ${air?'air':''}" style="position:static;font-size:10px">${air?'AÉREO':'BARCO'}</span></div>
-        <div class="modal-name">${c.es}${p.size?(' · '+p.size):''}</div>
+        <div class="modal-name">${nombreMostrar(p)}${p.size?(' · '+p.size):''}</div>
       </div>
       <button class="modal-x" id="mx">✕</button>
     </div>
@@ -224,19 +250,20 @@ function openDetail(id){
         ${fotoActions}
       </div>
       <div class="modal-right">
+        <div class="genbar" id="genbar"></div>
         <div class="tabs">
           <button class="tab on" data-tab="prev">Vista previa</button>
           <button class="tab" data-tab="html">HTML TiendaNube</button>
           <button class="tab" data-tab="txt">Texto MercadoLibre</button>
         </div>
-        <div class="tabpane" id="pane-prev">${html}</div>
+        <div class="tabpane" id="pane-prev"></div>
         <div class="tabpane hidden" id="pane-html">
           <button class="copybtn" data-copy="html">Copiar HTML</button>
-          <textarea readonly id="ta-html">${escapeHtml(html)}</textarea>
+          <textarea id="ta-html" spellcheck="false" placeholder="Generá la descripción para ver el HTML acá. Podés editarlo antes de copiar."></textarea>
         </div>
         <div class="tabpane hidden" id="pane-txt">
           <button class="copybtn" data-copy="txt">Copiar texto ML</button>
-          <textarea readonly id="ta-txt">${escapeHtml(txt)}</textarea>
+          <textarea id="ta-txt" spellcheck="false" placeholder="Generá la descripción para ver el texto de MercadoLibre acá. Podés editarlo antes de copiar."></textarea>
         </div>
       </div>
     </div>
@@ -252,11 +279,12 @@ function openDetail(id){
   });
   back.querySelectorAll('.copybtn').forEach(b=>{
     b.onclick=()=>{
-      const txtEl=back.querySelector(b.dataset.copy==='html'?'#ta-html':'#ta-txt');
-      navigator.clipboard.writeText(b.dataset.copy==='html'?html:txt).then(()=>{
+      const ta=back.querySelector(b.dataset.copy==='html'?'#ta-html':'#ta-txt');
+      if(!ta.value){ flashBtn(b,'Nada que copiar',true); return; }
+      navigator.clipboard.writeText(ta.value).then(()=>{
         const old=b.textContent; b.textContent='✓ Copiado'; b.classList.add('ok');
         setTimeout(()=>{b.textContent=old;b.classList.remove('ok');},1400);
-      }).catch(()=>{ txtEl.select(); document.execCommand('copy'); });
+      }).catch(()=>{ ta.select(); document.execCommand('copy'); });
     };
   });
   // ----- Camino B: descargar / copiar la foto del producto -----
@@ -297,6 +325,72 @@ function openDetail(id){
       im.onerror=()=>flashBtn(copyBtn,'No se pudo',true);
       im.src=p.img;
     };
+  }
+  // ----- Generación de descripción por API (foto -> 6 bloques + categoría) -----
+  const taHtml=back.querySelector('#ta-html'), taTxt=back.querySelector('#ta-txt');
+  // edición humana: lo que se edita queda cacheado y es lo que se copia/publica.
+  taHtml.oninput=()=>{ const d=descGet(p.code)||{}; d.html_tiendanube=taHtml.value; d.edited=true; descSet(p.code,d); back.querySelector('#pane-prev').innerHTML=taHtml.value||''; };
+  taTxt.oninput =()=>{ const d=descGet(p.code)||{}; d.txt_mercadolibre=taTxt.value; d.edited=true; descSet(p.code,d); };
+  renderGen(back,p);
+}
+
+// Pinta la barra de generación y los paneles según el caché actual del producto.
+function renderGen(back,p){
+  const d=descGet(p.code);
+  const genbar=back.querySelector('#genbar');
+  const prev=back.querySelector('#pane-prev');
+  const taHtml=back.querySelector('#ta-html'), taTxt=back.querySelector('#ta-txt');
+  if(d){
+    genbar.innerHTML=`
+      <div class="gen-info">
+        <div class="gen-tipo">${escapeHtml(d.tipo_real||'Descripción generada')}${d.contradice_excel?' <span class="dbadge fix">categoría corregida ✓</span>':''}${d.edited?' <span class="dbadge">editada</span>':''}</div>
+        ${d.nota_revision?`<div class="gen-nota"><b>Nota de revisión:</b> ${escapeHtml(d.nota_revision)}</div>`:''}
+      </div>
+      <button type="button" class="genbtn re" id="btnGen">↻ Regenerar</button>`;
+    prev.innerHTML=d.html_tiendanube||'<div class="gen-empty">—</div>';
+    taHtml.value=d.html_tiendanube||'';
+    taTxt.value=d.txt_mercadolibre||'';
+  }else{
+    genbar.innerHTML=`
+      <div class="gen-info">
+        <div class="gen-tipo">Sin descripción generada</div>
+        <div class="gen-nota">Se genera mirando la foto del producto. Si el Excel está mal categorizado, lo corrige.</div>
+      </div>
+      <button type="button" class="genbtn" id="btnGen">✨ Generar descripción</button>`;
+    prev.innerHTML=`<div class="gen-empty">Todavía no se generó la descripción de este producto.<br>Tocá <b>“Generar descripción”</b>.</div>`;
+    taHtml.value=''; taTxt.value='';
+  }
+  back.querySelector('#btnGen').onclick=()=>generarDesc(back,p);
+}
+
+// Llama al backend aislado (App Platform) y cachea el resultado.
+async function generarDesc(back,p){
+  let backend=getBackendURL();
+  if(!backend){
+    if(isBoss()){
+      const v=prompt('URL del backend de descripciones (DigitalOcean App Platform).\nEj: https://servifibras-backend-xxxxx.ondigitalocean.app');
+      if(v && v.trim()){ localStorage.setItem('backend_url', v.trim().replace(/\/+$/,'')); backend=getBackendURL(); }
+      else return;
+    }else{ alert('El backend de descripciones todavía no está configurado. Pedile al encargado que lo cargue.'); return; }
+  }
+  const btn=back.querySelector('#btnGen'); const old=btn.textContent;
+  btn.disabled=true; btn.textContent='⏳ Generando…';
+  try{
+    const r=await fetch(backend+'/api/generar',{
+      method:'POST', headers:{'content-type':'application/json'},
+      body:JSON.stringify({ code:p.code, desc:p.desc, size:p.size, ship:p.ship, img:p.img||'', force:!!descGet(p.code) })
+    });
+    const data=await r.json().catch(()=>({error:'Respuesta inválida del backend'}));
+    if(!r.ok) throw new Error(data.error||('HTTP '+r.status));
+    data.ts=Date.now();
+    descSet(p.code,data);
+    renderGen(back,p);
+    const nm=back.querySelector('.modal-name'); if(nm) nm.textContent=(data.nombre_publicacion||clasificar(p).es)+(p.size?(' · '+p.size):'');
+    renderGrid();
+  }catch(e){
+    console.error(e);
+    btn.disabled=false; btn.textContent=old;
+    alert('No se pudo generar la descripción:\n'+(e.message||e)+'\n\nRevisá que el backend esté andando y la URL sea correcta.');
   }
 }
 function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
