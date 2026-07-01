@@ -187,6 +187,7 @@ function buildAssignPanel(){
     <div id="arows"></div>
     <div class="assign-actions">
       <button class="btn-pri" id="rebalance">Reparto parejo</button>
+      <button class="btn-ghost" id="genLote">✨ Generar descripciones pendientes (IA)</button>
       <button class="btn-ghost" id="resetDone">Borrar todo el avance</button>
       <button class="btn-ghost" id="cfgBackend">⚙ Backend de descripciones</button>
     </div>
@@ -197,6 +198,7 @@ function buildAssignPanel(){
   document.getElementById('resetDone').onclick=async()=>{
     if(confirm('¿Borrar TODO el avance de este lote? No se puede deshacer.')){ DONE={}; await sSet(K_DONE,DONE); renderStrip(); renderGrid(); }
   };
+  document.getElementById('genLote').onclick=(e)=>generarLoteAll(e.currentTarget);
   document.getElementById('cfgBackend').onclick=()=>{
     const v=prompt('URL del backend de descripciones (DigitalOcean App Platform).\nEj: https://servifibras-backend-xxxxx.ondigitalocean.app\n\n(Vacío para borrar la configuración.)', getBackendURL());
     if(v===null) return;
@@ -361,6 +363,37 @@ function renderGen(back,p){
     taHtml.value=''; taTxt.value='';
   }
   back.querySelector('#btnGen').onclick=()=>generarDesc(back,p);
+}
+
+// Generación por lote (encargado): recorre los productos sin descripción cacheada y
+// con foto, generando de a uno con un pequeño delay para no saturar la API.
+async function generarLoteAll(btn){
+  let backend=getBackendURL();
+  if(!backend){
+    const v=prompt('URL del backend de descripciones (DigitalOcean App Platform).\nEj: https://servifibras-backend-xxxxx.ondigitalocean.app');
+    if(v && v.trim()){ localStorage.setItem('backend_url', v.trim().replace(/\/+$/,'')); backend=getBackendURL(); }
+    else return;
+  }
+  const pend=P.filter(p=>!descGet(p.code) && p.img);
+  if(!pend.length){ alert('No hay descripciones pendientes por generar (o faltan fotos).'); return; }
+  if(!confirm(`Generar ${pend.length} descripciones con IA?\nTiene un costo de API (una sola vez) y puede tardar unos minutos.`)) return;
+  const old=btn.textContent; btn.disabled=true; let ok=0, fail=0;
+  for(let i=0;i<pend.length;i++){
+    const p=pend[i];
+    btn.textContent=`Generando ${i+1}/${pend.length}…`;
+    try{
+      const r=await fetch(backend+'/api/generar',{
+        method:'POST', headers:{'content-type':'application/json'},
+        body:JSON.stringify({ code:p.code, desc:p.desc, size:p.size, ship:p.ship, img:p.img||'' })
+      });
+      const data=await r.json().catch(()=>({error:'Respuesta inválida del backend'}));
+      if(!r.ok) throw new Error(data.error||('HTTP '+r.status));
+      data.ts=Date.now(); descSet(p.code,data); ok++;
+    }catch(e){ fail++; console.error('Falló',p.code,'→',(e&&e.message)||e); }
+    await new Promise(res=>setTimeout(res,400));
+  }
+  btn.disabled=false; btn.textContent=old; renderGrid();
+  alert(`Listo.\nGeneradas: ${ok}\nFallidas: ${fail}`);
 }
 
 // Llama al backend aislado (App Platform) y cachea el resultado.

@@ -18,7 +18,7 @@ const cors = require('cors');
 const PORT = process.env.PORT || 8080;
 const API_KEY = process.env.ANTHROPIC_API_KEY;       // se carga en el panel de App Platform
 const MODEL = process.env.MODEL || 'claude-opus-4-8'; // mejor calidad de copy; cambiable por env
-const MAX_TOKENS = parseInt(process.env.MAX_TOKENS || '4000', 10);
+const MAX_TOKENS = parseInt(process.env.MAX_TOKENS || '8000', 10); // dos descripciones + schema: 8000 evita truncar
 // Origen permitido (el tablero en GitHub Pages). Coma-separado para varios.
 const ALLOWED = (process.env.ALLOWED_ORIGIN || 'https://servifibras-web.github.io')
   .split(',').map(s => s.trim()).filter(Boolean);
@@ -142,6 +142,24 @@ function extractJSON(text) {
   return JSON.parse(t);
 }
 
+/* Salida estructurada: obliga a la API a devolver EXACTAMENTE este objeto como JSON
+   válido. Elimina el punto frágil de parsear a mano un JSON con HTML grande adentro
+   (una comilla mal escapada rompía JSON.parse). Ver docs API: output_config.format. */
+const DESC_SCHEMA = {
+  type: 'object',
+  properties: {
+    tipo_real:          { type: 'string' },
+    nombre_publicacion: { type: 'string' },
+    categoria:          { type: 'string', enum: ['molde','set','mat','herraje','deco','acc','equipo','marcador','otro'] },
+    contradice_excel:   { type: 'boolean' },
+    nota_revision:      { type: 'string' },
+    html_tiendanube:    { type: 'string' },
+    txt_mercadolibre:   { type: 'string' },
+  },
+  required: ['tipo_real','nombre_publicacion','categoria','contradice_excel','nota_revision','html_tiendanube','txt_mercadolibre'],
+  additionalProperties: false,
+};
+
 async function generarDescripcion(p) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -154,6 +172,7 @@ async function generarDescripcion(p) {
       model: MODEL,
       max_tokens: MAX_TOKENS,
       system: SYSTEM_PROMPT,
+      output_config: { format: { type: 'json_schema', schema: DESC_SCHEMA } },
       messages: [{ role: 'user', content: buildUserContent(p) }],
     }),
   });
@@ -165,7 +184,9 @@ async function generarDescripcion(p) {
   }
   const data = await resp.json();
   const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-  const out = extractJSON(text);
+  // Con output_config.format el texto ES JSON válido; extractJSON queda de fallback defensivo.
+  let out;
+  try { out = JSON.parse(text); } catch (e) { out = extractJSON(text); }
   out._model = MODEL;
   out._usage = data.usage || null;
   return out;
