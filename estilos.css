@@ -134,6 +134,19 @@ button{font-family:inherit;cursor:pointer;border:none}
 .copybtn{padding:9px 16px;background:var(--plata);color:var(--bg);border-radius:8px;font-size:12.5px;font-weight:600}
 .copybtn:hover{filter:brightness(1.08)}
 .copybtn.ok{background:var(--done)}
+/* ---- Generación de descripción por API ---- */
+.genbar{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.gen-info{min-width:0;flex:1}
+.gen-tipo{font-size:13.5px;font-weight:600;color:var(--txt);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.gen-nota{font-size:11.5px;color:var(--plata-dim);line-height:1.5;margin-top:5px}
+.genbtn{flex:0 0 auto;padding:10px 15px;background:var(--plata);color:var(--bg);border-radius:8px;font-size:13px;font-weight:700;transition:.15s}
+.genbtn:hover{filter:brightness(1.08)}
+.genbtn:disabled{opacity:.6;cursor:default}
+.genbtn.re{background:var(--panel);color:var(--plata);border:1px solid var(--plata-dim)}
+.gen-empty{color:var(--muted);font-size:13px;line-height:1.6;text-align:center;padding:40px 16px;border:1px dashed var(--line);border-radius:10px}
+.dbadge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--done-bg);color:var(--done);border:1px solid rgba(62,207,142,.3);vertical-align:middle}
+.dbadge.fix{background:rgba(234,104,82,.14);color:var(--coral);border-color:rgba(234,104,82,.4)}
+.meta .dbadge{margin-top:6px}
 @media(max-width:640px){
   .modal-body{grid-template-columns:1fr}
   .modal-left{border-right:none;border-bottom:1px solid var(--line)}

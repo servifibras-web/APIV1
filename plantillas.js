@@ -34,64 +34,20 @@ function clasificar(p){
   for(const [rx,fn] of DICT){ const m=d.match(rx); if(m) return fn(m); }
   return {tipo:'Molde de silicona', es: d||'Molde de silicona', cat:'molde'};
 }
+// nombrePub: nombre provisional (Excel) para etiquetar la card antes de generar.
 function nombrePub(p){
   const c=clasificar(p);
   const med = p.size? ` ${p.size}` : '';
   return `${c.es}${med} · Resiners`;
 }
 
-/* ========= PLANTILLAS DESCRIPCIÓN ========= */
-// Acento plata para moldes (manual de marca ServiFibras), Poppins, inline CSS
-function htmlTiendaNube(p){
-  const c=clasificar(p);
-  const nombre=`${c.es}${p.size?(' '+p.size):''}`;
-  const PLATA='#C8D0D8', BG='#101820', TXT='#eef2f5', MUT='#8b97a3';
-  const medRow = p.size? `<tr><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${MUT}">Medida</td><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${TXT}">${p.size}</td></tr>`:'';
-  return `<div style="font-family:'Poppins',Arial,sans-serif;background:${BG};color:${TXT};padding:28px 22px;border-radius:14px;max-width:680px;margin:0 auto">
-<h2 style="margin:0 0 4px;font-size:22px;font-weight:600;color:${PLATA};letter-spacing:.3px">${nombre}</h2>
-<p style="margin:0 0 18px;font-size:13px;color:${MUT};letter-spacing:1px;text-transform:uppercase">Cód. ${p.code} · Resiners · ServiFibras</p>
-<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:${TXT}">${descLarga(c,p)}</p>
-<h3 style="margin:0 0 10px;font-size:14px;font-weight:600;color:${PLATA};letter-spacing:.5px">Especificaciones</h3>
-<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:18px">
-<tr><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${MUT}">Producto</td><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${TXT}">${c.tipo}</td></tr>
-<tr><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${MUT}">Código</td><td style="padding:8px 14px;border-bottom:1px solid #2a3949;color:${TXT}">${p.code}</td></tr>
-${medRow}
-<tr><td style="padding:8px 14px;color:${MUT}">Material</td><td style="padding:8px 14px;color:${TXT}">${c.cat==='herraje'?'Metal':c.cat==='deco'?'Decorativo':'Silicona de alta calidad'}</td></tr>
-</table>
-<div style="background:#18222e;border:1px solid #2a3949;border-radius:10px;padding:16px;margin-bottom:6px">
-<p style="margin:0;font-size:13.5px;line-height:1.55;color:${TXT}"><strong style="color:${PLATA}">ServiFibras</strong> · Importador directo de materiales para resina epoxi. Más de 25 años en el mercado. Envíos a todo el país.</p>
-</div>
-</div>`;
-}
-function descLarga(c,p){
-  const med = p.size? ` de ${p.size}` : '';
-  switch(c.cat){
-    case 'molde': return `${c.es}${med} fabricado en silicona flexible de alta calidad, ideal para trabajos con resina epoxi. Fácil desmolde, reutilizable y de larga duración. Permite obtener piezas con excelente terminación y detalle.`;
-    case 'set': return `${c.es}${med} en silicona flexible para resina epoxi. Set completo listo para trabajar, con desmolde fácil y terminación profesional. Reutilizable y de larga vida útil.`;
-    case 'mat': return `${c.es}${med}. Base de trabajo antiadherente para proteger tu mesa al trabajar con resina. La resina curada se despega con facilidad. Flexible y lavable.`;
-    case 'herraje': return `${c.es}. Accesorios metálicos para terminación y armado de tus piezas de resina: bijouterie, llaveros y proyectos decorativos.`;
-    case 'deco': return `${c.es}. Elemento decorativo para embeber en resina epoxi y dar color, brillo y textura a tus creaciones.`;
-    case 'equipo': return `${c.es}. Equipo auxiliar para el proceso de trabajo con resina epoxi.`;
-    case 'acc': return `${c.es}. Accesorio para el trabajo con resina epoxi, pensado para facilitar y mejorar tus proyectos.`;
-    default: return `${c.es}${med} para trabajos con resina epoxi.`;
-  }
-}
-// MercadoLibre: texto plano, sin HTML, optimizado para el campo descripción de ML
-function txtMercadoLibre(p){
-  const c=clasificar(p);
-  const nombre=`${c.es}${p.size?(' '+p.size):''}`;
-  let t=`${nombre.toUpperCase()} - RESINERS\n`;
-  t+=`Código: ${p.code}\n\n`;
-  t+=descLarga(c,p).replace(/<[^>]+>/g,'')+`\n\n`;
-  t+=`CARACTERÍSTICAS\n`;
-  t+=`- Producto: ${c.tipo}\n`;
-  t+=`- Código: ${p.code}\n`;
-  if(p.size) t+=`- Medida: ${p.size}\n`;
-  t+=`- Material: ${c.cat==='herraje'?'Metal':c.cat==='deco'?'Decorativo':'Silicona de alta calidad'}\n\n`;
-  t+=`SERVIFIBRAS\n`;
-  t+=`Importador directo de materiales para resina epoxi. Más de 25 años en el mercado. Envíos a todo el país. Consultanos por mayorista.`;
-  return t;
-}
+/* ========= DESCRIPCIONES =========
+ * La generación por PLANTILLA genérica (htmlTiendaNube/descLarga/txtMercadoLibre)
+ * fue ELIMINADA: producía 62 textos casi idénticos para los moldes y no miraba
+ * la foto. Ahora las descripciones se generan por producto vía API de Claude,
+ * usando la FOTO como insumo (ver app.js -> generarDesc + backend/). clasificar()
+ * se conserva solo como ETIQUETA PROVISIONAL de la card hasta que se genere. */
+
 // (Se quitaron linkAlibaba/linkGoogleImg: la busqueda por texto generica
 //  llevaba a moldes en general, no al producto. Ahora la busqueda es por
 //  IMAGEN real, manejada en el modal de app.js — Camino B.)
