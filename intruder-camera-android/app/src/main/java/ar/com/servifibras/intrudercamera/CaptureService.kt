@@ -36,6 +36,9 @@ class CaptureService : LifecycleService() {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Protección activa", NotificationManager.IMPORTANCE_LOW)
         )
+        nm.createNotificationChannel(
+            NotificationChannel(ALERT_CHANNEL_ID, "Alertas de intruso", NotificationManager.IMPORTANCE_HIGH)
+        )
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Protección activa")
             .setContentText("Se sacará una foto si hay intentos de desbloqueo fallidos")
@@ -60,6 +63,7 @@ class CaptureService : LifecycleService() {
     }
 
     private fun capture() {
+        logEvent("Intento de desbloqueo fallido")
         if (busy) return
         busy = true
         val providerFuture = ProcessCameraProvider.getInstance(this)
@@ -93,10 +97,13 @@ class CaptureService : LifecycleService() {
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             provider.unbindAll()
                             busy = false
+                            logEvent("Foto guardada: ${file.name}")
+                            notifyIntruder()
                         }
 
                         override fun onError(exc: ImageCaptureException) {
                             Log.e(TAG, "Error al sacar la foto", exc)
+                            logEvent("ERROR al sacar la foto: ${exc.message}")
                             provider.unbindAll()
                             busy = false
                         }
@@ -106,9 +113,39 @@ class CaptureService : LifecycleService() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun now(): String =
+        SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+
+    /** Agrega una línea con fecha y hora al registro (registro.txt). */
+    private fun logEvent(msg: String) {
+        try {
+            File(photosDir(this), LOG_NAME).appendText("${now()} - $msg\n")
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo escribir el registro", e)
+        }
+    }
+
+    private fun notifyIntruder() {
+        val open = android.app.PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val n = Notification.Builder(this, ALERT_CHANNEL_ID)
+            .setContentTitle("⚠️ Intruso detectado")
+            .setContentText("Intento de desbloqueo fallido el ${now()}. Tocá para ver la foto.")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        getSystemService(NotificationManager::class.java)
+            .notify(System.currentTimeMillis().toInt(), n)
+    }
+
     companion object {
         private const val TAG = "IntruderCamera"
         private const val CHANNEL_ID = "proteccion"
+        private const val ALERT_CHANNEL_ID = "alertas"
+        const val LOG_NAME = "registro.txt"
 
         @Volatile
         private var instance: CaptureService? = null

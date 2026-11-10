@@ -98,9 +98,18 @@ class MainActivity : Activity() {
 
         gallery.removeAllViews()
         val files = CaptureService.photosDir(this).listFiles()
+            ?.filter { it.extension == "jpg" }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
+        val fmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault())
+        gallery.addView(TextView(this).apply {
+            textSize = 16f
+            text = "\nIntrusos registrados: ${files.size} (log completo en registro.txt)"
+        })
         files.take(30).forEach { f ->
-            gallery.addView(TextView(this).apply { text = f.name })
+            gallery.addView(TextView(this).apply {
+                textSize = 15f
+                text = "📅 ${fmt.format(java.util.Date(f.lastModified()))}"
+            })
             gallery.addView(ImageView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 600
